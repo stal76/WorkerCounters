@@ -16,5 +16,3 @@ executable('cli',
            'shared_memory.cpp',
            'processes_data_exchange.cpp',
            install : true)
-           
-#install_data('build/server_counters', install_dir: 'exe')
