@@ -16,3 +16,8 @@ executable('cli',
            'shared_memory.cpp',
            'processes_data_exchange.cpp',
            install : true)
+
+executable('test_numa',
+           'test_numa.cpp',
+           dependencies: dependency('numa'),
+           install : true)
