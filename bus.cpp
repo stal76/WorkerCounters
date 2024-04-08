@@ -1,4 +1,5 @@
 #include "bus.h"
+#include "idp.h"
 
 void Bus::SetBuffers(uint64_t* buf_requests, uint64_t* buf_errors) {
 	requests = buf_requests;

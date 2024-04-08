@@ -1,13 +1,13 @@
 #pragma once
 
-#include "processes_data_exchange.h"
+#include "pde.h"
 #include <thread>
 
 class Worker {
 public:
 	Worker(tCoreId core_id);
-	static uint64_t FillMetadataWorkerCounters(common::processes_data_exchange::MetadataWorkerCounters* metadata, uint64_t start_position);
-	void SetBufferForCounters(void* buffer, const common::processes_data_exchange::MetadataWorkerCounters& metadata);
+	static uint64_t FillMetadataWorkerCounters(common::pde::MetadataWorker* metadata);
+	void SetBufferForCounters(void* buffer, const common::pde::MetadataWorker& metadata);
 	void Start();
 	void Join();
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bus.h"
-#include "processes_data_exchange.h"
+#include "pde.h"
 #include "worker.h"
 #include "worker_gc.h"
 
@@ -16,7 +16,7 @@ public:
 
 private:
 	Bus bus;
-	common::processes_data_exchange::MainFileData processes_data;
+	common::pde::MainFileData processes_data;
 
 	std::map<tCoreId, Worker*> workers;
 	std::map<tCoreId, WorkerGC*> workers_gc;

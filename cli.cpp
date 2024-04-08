@@ -3,8 +3,8 @@
 #include <thread>
 #include <unistd.h>
 
-#include "common.h"
-#include "processes_data_exchange.h"
+#include "idp.h"
+#include "pde.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_DEBUG;
 
@@ -56,14 +56,14 @@ int main() {
 	std::cout << "Start cli, pid = " << getpid() << "\n";
 
     bool useHugeMem = false;
-    common::processes_data_exchange::MainFileData processes_data;
+    common::pde::MainFileData processes_data;
     eResult result = processes_data.ReadFromDataplane(useHugeMem, true);
     if (result != eResult::success) {
         exit(1);
     }
 
-    TestBusStat(processes_data.GetStartBufferOtherCounters(processes_data.metadata_other_counters.start_bus_errors),
-                processes_data.GetStartBufferOtherCounters(processes_data.metadata_other_counters.start_bus_requests));
+    TestBusStat(processes_data.BufferCommonCounters(processes_data.common_counters.start_bus_errors),
+                processes_data.BufferCommonCounters(processes_data.common_counters.start_bus_requests));
 
     uint64_t pos_in_cnts = processes_data.metadata_workers.counter_positions["balancer_icmp_generated_echo_reply_ipv6"];
     uint64_t pos_in_stats = processes_data.metadata_workers.counter_positions["decap_fragments"];
@@ -71,8 +71,8 @@ int main() {
 
     while (true) {
         std::cout << "\r";
-        for (const auto& iter : processes_data.workers.workers) {
-            uint64_t* buffer = (uint64_t*)processes_data.GetStartBufferForWorker(iter.first);
+        for (auto [core_id, info] : processes_data.common_data.workers) {
+            uint64_t* buffer = (uint64_t*)info.buffer;
 
             // get by names - "named" counter and value from structure stats
             uint64_t from_counters = buffer[processes_data.metadata_workers.index_counters + pos_in_cnts];
@@ -85,18 +85,18 @@ int main() {
             // get from stats_ports, in test check only physicalPort_egress_drops in last element of array
             uint64_t from_stats_ports = buffer[processes_data.metadata_workers.index_stats_ports + 2 * CONFIG_YADECAP_PORTS_SIZE - 2];
 
-            ShowWorkerInfo(iter.first, 0xfe,
+            ShowWorkerInfo(core_id, 0xfe,
                            {{"counters", from_counters}, {"stats", from_stats}, {"acl", from_acl},
                             {"bursts", from_bursts}, {"stats_ports", from_stats_ports}});
         }
 
-        for (const auto& iter : processes_data.workers_gc.workers) {
-            uint64_t* buffer = (uint64_t*)processes_data.GetStartBufferForWorkerGC(iter.first);
+        for (auto [core_id, info] : processes_data.common_data.workers_gc) {
+            uint64_t* buffer = (uint64_t*)info.buffer;
 
             uint64_t from_counters = buffer[processes_data.metadata_workers_gc.index_counters + 11];
             uint64_t from_stats = buffer[processes_data.metadata_workers_gc.index_counters + gc_pos_in_stats];
 
-            ShowWorkerInfo(iter.first, 0xff, {{"gc_counters", from_counters}, {"gc_stats", from_stats}});
+            ShowWorkerInfo(core_id, 0xff, {{"gc_counters", from_counters}, {"gc_stats", from_stats}});
         }
         
         std::cout.flush();

@@ -1,58 +1,64 @@
 #include "worker.h"
+#include "type.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 Worker::Worker(tCoreId core_id) : core_id_(core_id) {
 }
 
-uint64_t Worker::FillMetadataWorkerCounters(common::processes_data_exchange::MetadataWorkerCounters* metadata, uint64_t start_position) {
-	metadata->start_counters = start_position;
-	metadata->start_acl_counters = common::processes_data_exchange::BufferWriter::AllignToSizeCacheLine(metadata->start_counters + YANET_CONFIG_COUNTERS_SIZE * sizeof(uint64_t));
-	metadata->start_bursts = common::processes_data_exchange::BufferWriter::AllignToSizeCacheLine(metadata->start_acl_counters + YANET_CONFIG_ACL_COUNTERS_SIZE * sizeof(uint64_t));
-    metadata->start_stats = common::processes_data_exchange::BufferWriter::AllignToSizeCacheLine(metadata->start_bursts + (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t));
-    metadata->start_stats_ports = common::processes_data_exchange::BufferWriter::AllignToSizeCacheLine(metadata->start_stats + sizeof(common::worker::stats::common));
-	uint64_t start_next = common::processes_data_exchange::BufferWriter::AllignToSizeCacheLine(metadata->start_stats_ports + CONFIG_YADECAP_PORTS_SIZE * sizeof(common::worker::stats::port)); // ?
-	metadata->total_size = start_next - start_position;
+uint64_t Worker::FillMetadataWorkerCounters(common::pde::MetadataWorker* metadata) {
+	metadata->start_counters = 0;
+	metadata->start_acl_counters = common::pde::AllignToSizeCacheLine(metadata->start_counters + YANET_CONFIG_COUNTERS_SIZE * sizeof(uint64_t));
+	metadata->start_bursts = common::pde::AllignToSizeCacheLine(metadata->start_acl_counters + YANET_CONFIG_ACL_COUNTERS_SIZE * sizeof(uint64_t));
+    metadata->start_stats = common::pde::AllignToSizeCacheLine(metadata->start_bursts + (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t));
+    metadata->start_stats_ports = common::pde::AllignToSizeCacheLine(metadata->start_stats + sizeof(common::worker::stats::common));
+	uint64_t start_next = common::pde::AllignToSizeCacheLine(metadata->start_stats_ports + CONFIG_YADECAP_PORTS_SIZE * sizeof(common::worker::stats::port)); // ?
+	metadata->total_size = start_next - 0;
 	metadata->UpdateIndexes();
 
 	// stats
-	common::worker::stats::common fake_stats;
-	std::map<std::string, void*> counters_stats;
-	counters_stats["brokenPackets"] = &fake_stats.brokenPackets;
-	counters_stats["dropPackets"] = &fake_stats.dropPackets;
-	counters_stats["ring_highPriority_drops"] = &fake_stats.ring_highPriority_drops;
-	counters_stats["ring_normalPriority_drops"] = &fake_stats.ring_normalPriority_drops;
-	counters_stats["ring_lowPriority_drops"] = &fake_stats.ring_lowPriority_drops;
-	counters_stats["ring_highPriority_packets"] = &fake_stats.ring_highPriority_packets;
-	counters_stats["ring_normalPriority_packets"] = &fake_stats.ring_normalPriority_packets;
-	counters_stats["ring_lowPriority_packets"] = &fake_stats.ring_lowPriority_packets;
-	counters_stats["decap_packets"] = &fake_stats.decap_packets;
-	counters_stats["decap_fragments"] = &fake_stats.decap_fragments;
-	counters_stats["decap_unknownExtensions"] = &fake_stats.decap_unknownExtensions;
-	counters_stats["interface_lookupMisses"] = &fake_stats.interface_lookupMisses;
-	counters_stats["interface_hopLimits"] = &fake_stats.interface_hopLimits;
-	counters_stats["interface_neighbor_invalid"] = &fake_stats.interface_neighbor_invalid;
-	counters_stats["nat64stateless_ingressPackets"] = &fake_stats.nat64stateless_ingressPackets;
-	counters_stats["nat64stateless_ingressFragments"] = &fake_stats.nat64stateless_ingressFragments;
-	counters_stats["nat64stateless_ingressUnknownICMP"] = &fake_stats.nat64stateless_ingressUnknownICMP;
-	counters_stats["nat64stateless_egressPackets"] = &fake_stats.nat64stateless_egressPackets;
-	counters_stats["nat64stateless_egressFragments"] = &fake_stats.nat64stateless_egressFragments;
-	counters_stats["nat64stateless_egressUnknownICMP"] = &fake_stats.nat64stateless_egressUnknownICMP;
-	counters_stats["balancer_invalid_reals_count"] = &fake_stats.balancer_invalid_reals_count;
-	counters_stats["fwsync_multicast_egress_drops"] = &fake_stats.fwsync_multicast_egress_drops;
-	counters_stats["fwsync_multicast_egress_packets"] = &fake_stats.fwsync_multicast_egress_packets;
-	counters_stats["fwsync_multicast_egress_imm_packets"] = &fake_stats.fwsync_multicast_egress_imm_packets;
-	counters_stats["fwsync_no_config_drops"] = &fake_stats.fwsync_no_config_drops;
-	counters_stats["fwsync_unicast_egress_drops"] = &fake_stats.fwsync_unicast_egress_drops;
-	counters_stats["fwsync_unicast_egress_packets"] = &fake_stats.fwsync_unicast_egress_packets;
-	counters_stats["acl_ingress_dropPackets"] = &fake_stats.acl_ingress_dropPackets;
-	counters_stats["acl_egress_dropPackets"] = &fake_stats.acl_egress_dropPackets;
-	counters_stats["repeat_ttl"] = &fake_stats.repeat_ttl;
-	counters_stats["leakedMbufs"] = &fake_stats.leakedMbufs;
-	counters_stats["logs_packets"] = &fake_stats.logs_packets;
-	counters_stats["logs_drops"] = &fake_stats.logs_drops;
-	metadata->AddCounters(counters_stats, metadata->start_stats, &fake_stats);
+	static_assert(std::is_trivially_destructible<common::worker::stats::common>::value, "invalid struct destructible");
+	std::map<std::string, uint64_t> counters_stats;
+	counters_stats["brokenPackets"] = offsetof(common::worker::stats::common, brokenPackets);
+	counters_stats["dropPackets"] = offsetof(common::worker::stats::common, dropPackets);
+	counters_stats["ring_highPriority_drops"] = offsetof(common::worker::stats::common, ring_highPriority_drops);
+	counters_stats["ring_normalPriority_drops"] = offsetof(common::worker::stats::common, ring_normalPriority_drops);
+	counters_stats["ring_lowPriority_drops"] = offsetof(common::worker::stats::common, ring_lowPriority_drops);
+	counters_stats["ring_highPriority_packets"] = offsetof(common::worker::stats::common, ring_highPriority_packets);
+	counters_stats["ring_normalPriority_packets"] = offsetof(common::worker::stats::common, ring_normalPriority_packets);
+	counters_stats["ring_lowPriority_packets"] = offsetof(common::worker::stats::common, ring_lowPriority_packets);
+	counters_stats["decap_packets"] = offsetof(common::worker::stats::common, decap_packets);
+	counters_stats["decap_fragments"] = offsetof(common::worker::stats::common, decap_fragments);
+	counters_stats["decap_unknownExtensions"] = offsetof(common::worker::stats::common, decap_unknownExtensions);
+	counters_stats["interface_lookupMisses"] = offsetof(common::worker::stats::common, interface_lookupMisses);
+	counters_stats["interface_hopLimits"] = offsetof(common::worker::stats::common, interface_hopLimits);
+	counters_stats["interface_neighbor_invalid"] = offsetof(common::worker::stats::common, interface_neighbor_invalid);
+	counters_stats["nat64stateless_ingressPackets"] = offsetof(common::worker::stats::common, nat64stateless_ingressPackets);
+	counters_stats["nat64stateless_ingressFragments"] = offsetof(common::worker::stats::common, nat64stateless_ingressFragments);
+	counters_stats["nat64stateless_ingressUnknownICMP"] = offsetof(common::worker::stats::common, nat64stateless_ingressUnknownICMP);
+	counters_stats["nat64stateless_egressPackets"] = offsetof(common::worker::stats::common, nat64stateless_egressPackets);
+	counters_stats["nat64stateless_egressFragments"] = offsetof(common::worker::stats::common, nat64stateless_egressFragments);
+	counters_stats["nat64stateless_egressUnknownICMP"] = offsetof(common::worker::stats::common, nat64stateless_egressUnknownICMP);
+	counters_stats["balancer_invalid_reals_count"] = offsetof(common::worker::stats::common, balancer_invalid_reals_count);
+	counters_stats["fwsync_multicast_egress_drops"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_drops);
+	counters_stats["fwsync_multicast_egress_packets"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_packets);
+	counters_stats["fwsync_multicast_egress_imm_packets"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_imm_packets);
+	counters_stats["fwsync_no_config_drops"] = offsetof(common::worker::stats::common, fwsync_no_config_drops);
+	counters_stats["fwsync_unicast_egress_drops"] = offsetof(common::worker::stats::common, fwsync_unicast_egress_drops);
+	counters_stats["fwsync_unicast_egress_packets"] = offsetof(common::worker::stats::common, fwsync_unicast_egress_packets);
+	counters_stats["acl_ingress_dropPackets"] = offsetof(common::worker::stats::common, acl_ingress_dropPackets);
+	counters_stats["acl_egress_dropPackets"] = offsetof(common::worker::stats::common, acl_egress_dropPackets);
+	counters_stats["repeat_ttl"] = offsetof(common::worker::stats::common, repeat_ttl);
+	counters_stats["leakedMbufs"] = offsetof(common::worker::stats::common, leakedMbufs);
+	counters_stats["logs_packets"] = offsetof(common::worker::stats::common, logs_packets);
+	counters_stats["logs_drops"] = offsetof(common::worker::stats::common, logs_drops);
+	for (const auto& iter : counters_stats) {
+	    metadata->counter_positions[iter.first] = (metadata->start_stats + iter.second) / sizeof(uint64_t);
+    }
 
 	// counters
 	std::map<std::string, common::globalBase::static_counter_type> counters_named;
@@ -88,18 +94,20 @@ uint64_t Worker::FillMetadataWorkerCounters(common::processes_data_exchange::Met
 	// No balancer_fragment_drops
 	counters_named["balancer_fragment_drops"] = common::globalBase::static_counter_type::balancer_fragment_drops;
 
-	metadata->AddCounters(counters_named, metadata->start_counters);
+	for (const auto& iter : counters_named) {
+        metadata->counter_positions[iter.first] = metadata->start_counters / sizeof(uint64_t) + static_cast<uint64_t>(iter.second);
+    }
 
 	return start_next;
 }
 
-void Worker::SetBufferForCounters(void* buffer, const common::processes_data_exchange::MetadataWorkerCounters& metadata) {
+void Worker::SetBufferForCounters(void* buffer, const common::pde::MetadataWorker& metadata) {
 	// std::cout << "Set buffer: " << buffer << "\n";
-	counters = static_cast<uint64_t*>(common::processes_data_exchange::PtrAdd(buffer, metadata.start_counters));
-	aclCounters = static_cast<uint64_t*>(common::processes_data_exchange::PtrAdd(buffer, metadata.start_acl_counters));
-	bursts = static_cast<uint64_t*>(common::processes_data_exchange::PtrAdd(buffer, metadata.start_bursts));
-	stats = static_cast<common::worker::stats::common*>(common::processes_data_exchange::PtrAdd(buffer, metadata.start_stats));
-	statsPorts = static_cast<common::worker::stats::port*>(common::processes_data_exchange::PtrAdd(buffer, metadata.start_stats_ports));
+	counters = static_cast<uint64_t*>(common::pde::PtrAdd(buffer, metadata.start_counters));
+	aclCounters = static_cast<uint64_t*>(common::pde::PtrAdd(buffer, metadata.start_acl_counters));
+	bursts = static_cast<uint64_t*>(common::pde::PtrAdd(buffer, metadata.start_bursts));
+	stats = static_cast<common::worker::stats::common*>(common::pde::PtrAdd(buffer, metadata.start_stats));
+	statsPorts = static_cast<common::worker::stats::port*>(common::pde::PtrAdd(buffer, metadata.start_stats_ports));
 }
 
 void Worker::Start() {

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "processes_data_exchange.h"
+#include "pde.h"
 
 class WorkerGC {
 public:
 	WorkerGC(tCoreId core_id);
-	static uint64_t FillMetadataWorkerCounters(common::processes_data_exchange::MetadataWorkerGcCounters* metadata, uint64_t start_position);
-	void SetBufferForCounters(void* buffer, const common::processes_data_exchange::MetadataWorkerGcCounters& metadata);
+	static uint64_t FillMetadataWorkerCounters(common::pde::MetadataWorkerGc* metadata);
+	void SetBufferForCounters(void* buffer, const common::pde::MetadataWorkerGc& metadata);
 	void Start();
 	void Join();
 
